@@ -1,0 +1,25 @@
+name: LuckySixUpdate
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+jobs:
+  run-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install Dependencies
+        run: pip install pandas numpy
+      - name: Run Engine
+        run: python app.py
+      - name: Commit and Push
+        run: |
+          git config --local user.email "bot@github.com"
+          git config --local user.name "LuckySix Bot"
+          git add data.json
+          git commit -m "Update Lotto Data" || exit 0
+          git push
