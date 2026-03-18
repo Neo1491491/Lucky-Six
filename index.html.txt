@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>LUCKY SIX 雲端監測系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: #0b0e11; color: white; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #1e2329; border-radius: 12px; padding: 20px; border: 1px solid #333; margin-bottom: 20px; }
+        .ball { display: inline-block; width: 40px; height: 40px; background: #f0b90b; color: black; 
+                border-radius: 50%; text-align: center; line-height: 40px; font-weight: bold; margin: 5px; }
+        h4 { color: #f0b90b; margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="card" style="text-align: center;">
+        <h2>🎰 LUCKY SIX AI 核心預測</h2>
+        <div id="balls"></div>
+        <p id="updateTime" style="color: #888; font-size: 0.8rem;"></p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h4>📈 號碼能量漂移 (Drift)</h4>
+            <canvas id="driftChart" height="200"></canvas>
+        </div>
+        <div class="card">
+            <h4>💰 近 28 期命中走勢</h4>
+            <canvas id="hitChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <script>
+        async function initSystem() {
+            const res = await fetch('data.json');
+            const data = await res.json();
+            
+            // 更新更新時間與號碼
+            document.getElementById('updateTime').innerText = "最後更新: " + data.last_update;
+            data.recommendation.forEach(n => {
+                const b = document.createElement('div');
+                b.className = 'ball'; b.innerText = n < 10 ? '0'+n : n;
+                document.getElementById('balls').appendChild(b);
+            });
+
+            // 漂移圖表
+            new Chart(document.getElementById('driftChart'), {
+                type: 'line',
+                data: {
+                    labels: ['-4h', '-3h', '-2h', '-1h', '現在'],
+                    datasets: [{ label: '能量值', data: [72, 75, 71, 78, 82], borderColor: '#f0b90b' }]
+                }
+            });
+
+            // 命中走勢圖表
+            new Chart(document.getElementById('hitChart'), {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 28}, (_, i) => i + 1),
+                    datasets: [{
+                        label: '命中數',
+                        data: data.hit_trend,
+                        backgroundColor: (c) => c.raw >= 3 ? '#4ee44e' : '#555'
+                    }]
+                }
+            });
+        }
+        initSystem();
+    </script>
+</body>
+</html>
