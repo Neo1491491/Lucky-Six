@@ -1,39 +1,61 @@
-name: LuckySix-2.0-Automation
+name: Lucky-Six-Event-Aware-Updater
+
+# 觸發條件設定
 on:
   schedule:
-    - cron: '0 * * * *' # 每小時自動更新
-  workflow_dispatch: # 支援手動觸發
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # 賦予寫入權限，這非常重要
-    steps:
-      - name: 檢出代碼
-        uses: actions/checkout@v4 # 升級至最新版 v4
+    # 每天台灣時間 20:45 執行檢查 (對應 UTC 12:45)
+    # 分 時 日 月 週
+    - cron: '45 12 * * *'
+  
+  # 允許隨時從 GitHub 介面手動執行測試
+  workflow_dispatch:
 
-      - name: 設定 Python
+jobs:
+  smart-update:
+    runs-on: ubuntu-latest
+    
+    # 授予寫入權限，確保 data.json 能被更新回倉庫
+    permissions:
+      contents: write
+
+    steps:
+      - name: 1. 檢出原始碼 (Checkout)
+        uses: actions/checkout@v4
+
+      - name: 2. 初始化 Python 環境
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 安裝必要組件
-        run: pip install pandas numpy
-
-      - name: 執行核心運算
+      - name: 3. 安裝必要組件 (如有需要)
         run: |
-          # 檢查 app.py 是否存在於根目錄
+          python -m pip install --upgrade pip
+          # 若您的 app.py 需要爬蟲或數據處理，請取消下方註解
+          # pip install requests pandas beautifulsoup4
+
+      - name: 4. 執行智慧調度引擎 (Execution)
+        id: run_script
+        run: |
+          # 偵錯：確認檔案存在
           if [ ! -f "app.py" ]; then
-            echo "錯誤：找不到 app.py，請確認檔案在根目錄而非資料夾中！"
-            ls -R
+            echo "錯誤：根目錄找不到 app.py"
             exit 1
           fi
           python app.py
+        env:
+          PYTHONUNBUFFERED: 1
 
-      - name: 自動提交與推送
+      - name: 5. 自動偵測變動並推送到網頁 (Deploy)
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "LuckySix-Bot"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "Lucky-Six-Bot"
+          
           git add data.json
-          git commit -m "Auto Update: $(date)" || echo "No changes to commit"
-          git push
+          
+          # 偵錯邏輯：只有當 data.json 真正被 app.py 修改時才提交
+          if git diff --staged --quiet; then
+            echo "今日非開獎日且無加碼活動，數據未變動，跳過更新。"
+          else
+            git commit -m "Lucky-Six 自動更新 [$(date '+%Y-%m-%d %H:%M:%S')]"
+            git push
+          fi
