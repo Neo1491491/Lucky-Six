@@ -3,129 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUCKY SIX 2.9.1 | 數據實時對稱版</title>
+    <title>LUCKY SIX 3.0 | 交互式數據戰情室</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --gold: #f0b90b; --bg: #0b0e11; --card: #1e2329; --danger: #ff4d4d; --success: #4ee44e; --blue: #3498db; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; margin: 0; padding: 15px; }
+        :root { --gold: #f0b90b; --bg: #0b0e11; --card: #1e2329; --danger: #ff4d4d; --success: #4ee44e; --blue: #3498db; --purple: #a55eea; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; }
         .container { max-width: 1200px; margin: auto; }
-        .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #333; margin-bottom: 15px; position: relative; box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
+        .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #333; margin-bottom: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); transition: 0.3s; }
+        .card:hover { border-color: var(--gold); }
         h1, h4 { color: var(--gold); margin: 0; }
-        .ball-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; min-height: 45px; margin-top: 10px; }
-        .ball { width: 38px; height: 38px; border-radius: 50%; text-align: center; line-height: 38px; font-weight: 800; font-size: 0.95rem; }
+        
+        .ball-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; min-height: 40px; }
+        .ball { width: 34px; height: 34px; border-radius: 50%; text-align: center; line-height: 34px; font-weight: 800; font-size: 0.85rem; }
         .ball-predict { background: linear-gradient(135deg, var(--gold), #b8860b); color: black; }
         .ball-history { background: linear-gradient(135deg, var(--blue), #2980b9); color: white; }
-        .live-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; border: 1px solid var(--danger); margin-top: 15px; }
-        .live-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .main-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; }
+        .ball-special { background: linear-gradient(135deg, var(--danger), #c0392b); color: white; border: 2px solid white; }
+        
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .chart-box { height: 260px; position: relative; }
-        .info-label { font-size: 0.8rem; color: #888; font-weight: bold; margin-bottom: 5px; }
-        .update-tag { color: var(--gold); font-family: monospace; font-size: 0.9rem; margin-top: 10px; }
-        @media (max-width: 768px) { .main-grid, .chart-grid { grid-template-columns: 1fr; } }
+        .chart-box { height: 240px; cursor: crosshair; }
+        .info-label { font-size: 0.8rem; color: #aaa; margin-bottom: 5px; font-weight: bold; }
+        .highlight-text { color: var(--gold); font-size: 1.1rem; font-weight: bold; }
+        
+        .click-hint { font-size: 0.75rem; color: var(--success); margin-top: 5px; animation: blink 2s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="main-grid">
-            <div class="card" style="text-align: center;">
-                <h1>🎰 LUCKY SIX 2.9.1 實時系統</h1>
-                <div class="info-label" style="margin-top:15px;">下一期核心推薦 (Next Prediction)</div>
-                <div id="mainBalls" class="ball-row">數據加載中...</div>
-                <div class="update-tag">系統時間：<span id="liveClock">00:00:00</span></div>
-                <p id="trendBadge" style="color:var(--success); font-weight:bold; margin-top:10px;">--</p>
-            </div>
-            <div class="card">
-                <h4>🔴 開獎直播連線</h4>
-                <div class="live-container">
-                    <iframe src="https://www.youtube.com/embed/live_stream?channel=UC8V0t1E8Fj9XoX6xW3vY7Zg" frameborder="0" allowfullscreen></iframe>
-                </div>
-            </div>
+        <div class="card" style="text-align: center; border-bottom: 3px solid var(--gold);">
+            <h1>🎰 LUCKY SIX 3.0 交互戰情室</h1>
+            <div class="info-label" style="margin-top:10px;">下一期核心推薦 (Next Prediction)</div>
+            <div id="nextBalls" class="ball-row"></div>
+            <div class="click-hint">💡 提示：點擊下方圖表上的任一點，可追溯該期歷史對獎紀錄</div>
         </div>
 
         <div class="chart-grid">
             <div class="card">
-                <h4>📋 歷史獎號 (History)</h4>
-                <div style="text-align: center; margin: 15px 0;">
-                    <div class="info-label">第 <span id="issueActual">--</span> 期 實際獎號</div>
-                    <div id="historyBalls" class="ball-row"></div>
+                <h4>📋 歷史獎號追蹤 (Click to View)</h4>
+                <div style="text-align: center; margin: 15px 0; min-height: 100px;">
+                    <div id="issueText" class="highlight-text">請點擊圖表點位</div>
+                    <div id="actualBalls" class="ball-row"></div>
                 </div>
                 <div class="chart-box"><canvas id="historyChart"></canvas></div>
             </div>
+
             <div class="card">
-                <h4>🎯 預測效能 (Performance)</h4>
-                <div style="text-align: center; margin: 15px 0;">
-                    <div class="info-label">第 <span id="issuePredict">--</span> 期 系統預測</div>
-                    <div id="predictCompareBalls" class="ball-row"></div>
+                <h4>🎯 同期預測表現 (Performance)</h4>
+                <div style="text-align: center; margin: 15px 0; min-height: 100px;">
+                    <div class="info-label">當時系統預測號碼</div>
+                    <div id="predictBalls" class="ball-row"></div>
                 </div>
                 <div class="chart-box"><canvas id="hitChart"></canvas></div>
             </div>
         </div>
-
-        <div class="card">
-            <h4>📈 能量漂移監控 (Confidence Drift)</h4>
-            <div class="chart-box" style="height: 180px;"><canvas id="driftChart"></canvas></div>
-        </div>
     </div>
 
     <script>
+        let fullHistory = [];
         let charts = {};
-        function startClock() {
-            setInterval(() => {
-                const now = new Date();
-                const pad = (n) => n.toString().padStart(2, '0');
-                document.getElementById('liveClock').innerText = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-            }, 1000);
-        }
 
-        async function initDashboard() {
+        async function init() {
             try {
                 const res = await fetch('data.json?t=' + Date.now());
                 const data = await res.json();
+                fullHistory = data.history;
 
-                // 動態更新期數文字
-                document.getElementById('issueActual').innerText = data.current_issue || "--";
-                document.getElementById('issuePredict').innerText = data.current_issue || "--";
+                // 渲染下一期預測
+                renderBalls('nextBalls', data.next_prediction, 'ball-predict');
+                
+                // 預設顯示最新一期的歷史紀錄
+                updateInteractionView(27); 
 
-                // 渲染各組號碼球
-                renderBalls('mainBalls', data.recommendation, 'ball-predict');
-                renderBalls('historyBalls', data.last_actual, 'ball-history');
-                renderBalls('predictCompareBalls', data.last_predicted, 'ball-predict');
-
-                document.getElementById('trendBadge').innerText = "系統狀態: " + data.analysis_report.trend;
+                // 初始化圖表
                 renderCharts(data);
-            } catch (e) { console.error("Update Error", e); }
+            } catch (e) { console.error(e); }
+        }
+
+        function updateInteractionView(index) {
+            const record = fullHistory[index];
+            if(!record) return;
+
+            // 更新文字資訊
+            document.getElementById('issueText').innerText = `${record.date} 第 ${record.issue} 期`;
+
+            // 更新左側：獎號 + 特別號
+            const actualContainer = document.getElementById('actualBalls');
+            actualContainer.innerHTML = '';
+            record.actual.forEach(n => {
+                actualContainer.innerHTML += `<div class="ball ball-history">${n<10?'0'+n:n}</div>`;
+            });
+            actualContainer.innerHTML += `<div style="color:#666; font-weight:bold; margin:0 5px; line-height:34px;">+</div>`;
+            actualContainer.innerHTML += `<div class="ball ball-special">${record.special<10?'0'+record.special:record.special}</div>`;
+
+            // 更新右側：預測號碼
+            renderBalls('predictBalls', record.predict, 'ball-predict');
         }
 
         function renderBalls(id, nums, cls) {
             const el = document.getElementById(id);
             el.innerHTML = '';
-            if(!nums) return;
             nums.forEach(n => {
                 const b = document.createElement('div');
                 b.className = `ball ${cls}`;
-                b.innerText = n < 10 ? '0'+parseInt(n) : n;
+                b.innerText = n < 10 ? '0'+n : n;
                 el.appendChild(b);
             });
         }
 
         function renderCharts(data) {
-            const commonOpt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#333' } }, x: { display: false } } };
+            const labels = data.history.map(h => h.issue.slice(-3));
+            const hitData = data.history.map(h => h.hit_count);
             
+            // 通用點擊邏輯
+            const onClickEvent = (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    updateInteractionView(index);
+                }
+            };
+
+            // 左圖：歷史趨勢
             const ctxH = document.getElementById('historyChart').getContext('2d');
-            if(charts.h) charts.h.destroy();
-            charts.h = new Chart(ctxH, { type: 'line', data: { labels: Array.from({length: 28}, (_, i) => i), datasets: [{ data: data.hit_trend.map(v => 20+v*5+Math.random()*10), borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.1)', fill: true, tension: 0.4 }] }, options: commonOpt });
+            charts.h = new Chart(ctxH, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '能量軌跡',
+                        data: data.history.map(h => h.actual.reduce((a,b)=>a+b,0)/6),
+                        borderColor: '#3498db',
+                        pointBackgroundColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        fill: false
+                    }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    onClick: onClickEvent,
+                    scales: { y: { display: false }, x: { grid: { color: '#333' } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
 
+            // 右圖：命中柱狀
             const ctxHit = document.getElementById('hitChart').getContext('2d');
-            if(charts.hit) charts.hit.destroy();
-            charts.hit = new Chart(ctxHit, { type: 'bar', data: { labels: Array.from({length: 28}, (_, i) => i), datasets: [{ data: data.hit_trend, backgroundColor: (c) => c.raw >= 3 ? '#4ee44e' : 'rgba(255,255,255,0.2)', borderRadius: 4 }] }, options: { ...commonOpt, scales: { y: { max: 6, grid: { color: '#333' } }, x: { display: false } } } });
-
-            const ctxD = document.getElementById('driftChart').getContext('2d');
-            if(charts.d) charts.d.destroy();
-            charts.d = new Chart(ctxD, { type: 'line', data: { labels: [1,2,3,4,5], datasets: [{ label: '信心值', data: data.drift, borderColor: '#f0b90b', tension: 0.4 }, { label: '基準', data: [50,50,50,50,50], borderColor: '#ff4d4d', borderDash: [5,5], pointRadius: 0 }] }, options: { ...commonOpt, plugins: { legend: { display: true, labels: { color: '#fff' } } }, scales: { y: { min: 0, max: 100, grid: { color: '#333' } }, x: { display: true } } } });
+            charts.hit = new Chart(ctxHit, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '命中數',
+                        data: hitData,
+                        backgroundColor: hitData.map(v => v >= 3 ? '#4ee44e' : 'rgba(255,255,255,0.1)'),
+                        borderRadius: 4
+                    }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    onClick: onClickEvent,
+                    scales: { y: { max: 6, ticks: { stepSize: 1 } }, x: { grid: { display: false } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
 
-        window.onload = () => { startClock(); initDashboard(); };
+        window.onload = init;
     </script>
 </body>
 </html>
