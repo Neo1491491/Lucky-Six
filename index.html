@@ -2,71 +2,82 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>LUCKY SIX 雲端監測系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUCKY SIX 2.0 專業監控面板</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #0b0e11; color: white; font-family: 'Segoe UI', sans-serif; padding: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card { background: #1e2329; border-radius: 12px; padding: 20px; border: 1px solid #333; margin-bottom: 20px; }
-        .ball { display: inline-block; width: 40px; height: 40px; background: #f0b90b; color: black; 
-                border-radius: 50%; text-align: center; line-height: 40px; font-weight: bold; margin: 5px; }
-        h4 { color: #f0b90b; margin-top: 0; }
+        :root { --gold: #f0b90b; --bg: #0b0e11; --card: #1e2329; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        .card { background: var(--card); border-radius: 15px; padding: 25px; border: 1px solid #333; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .ball { display: inline-block; width: 50px; height: 50px; background: linear-gradient(145deg, var(--gold), #9a780a); color: black; border-radius: 50%; text-align: center; line-height: 50px; font-weight: 800; margin: 8px; font-size: 1.2rem; box-shadow: 0 5px 15px rgba(240, 185, 11, 0.3); }
+        .update-tag { font-size: 0.8rem; color: #888; margin-top: 10px; }
+        h1, h4 { color: var(--gold); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
     </style>
 </head>
 <body>
-    <div class="card" style="text-align: center;">
-        <h2>🎰 LUCKY SIX AI 核心預測</h2>
-        <div id="balls"></div>
-        <p id="updateTime" style="color: #888; font-size: 0.8rem;"></p>
-    </div>
-
-    <div class="grid">
-        <div class="card">
-            <h4>📈 號碼能量漂移 (Drift)</h4>
-            <canvas id="driftChart" height="200"></canvas>
+    <div class="container">
+        <div class="card" style="text-align: center;">
+            <h1>🎰 LUCKY SIX 2.0 核心預測</h1>
+            <div id="balls">系統正在初始化...</div>
+            <div class="update-tag" id="lastUpdate">等待 GitHub Actions 第一次運行...</div>
         </div>
-        <div class="card">
-            <h4>💰 近 28 期命中走勢</h4>
-            <canvas id="hitChart" height="200"></canvas>
+
+        <div class="grid">
+            <div class="card">
+                <h4>📈 能量漂移監控 (Drift)</h4>
+                <canvas id="driftChart"></canvas>
+            </div>
+            <div class="card">
+                <h4>💰 近 28 期命中趨勢</h4>
+                <canvas id="hitChart"></canvas>
+            </div>
         </div>
     </div>
 
     <script>
-        async function initSystem() {
-            const res = await fetch('data.json');
-            const data = await res.json();
-            
-            // 更新更新時間與號碼
-            document.getElementById('updateTime').innerText = "最後更新: " + data.last_update;
-            data.recommendation.forEach(n => {
-                const b = document.createElement('div');
-                b.className = 'ball'; b.innerText = n < 10 ? '0'+n : n;
-                document.getElementById('balls').appendChild(b);
-            });
+        async function loadData() {
+            try {
+                // 加上時間戳防止快取
+                const response = await fetch('data.json?t=' + new Date().getTime());
+                const data = await response.json();
+                
+                // 更新號碼
+                const ballContainer = document.getElementById('balls');
+                ballContainer.innerHTML = '';
+                data.recommendation.forEach(num => {
+                    const el = document.createElement('div');
+                    el.className = 'ball';
+                    el.innerText = num < 10 ? '0'+num : num;
+                    ballContainer.appendChild(el);
+                });
 
-            // 漂移圖表
-            new Chart(document.getElementById('driftChart'), {
-                type: 'line',
-                data: {
-                    labels: ['-4h', '-3h', '-2h', '-1h', '現在'],
-                    datasets: [{ label: '能量值', data: [72, 75, 71, 78, 82], borderColor: '#f0b90b' }]
-                }
-            });
+                document.getElementById('lastUpdate').innerText = "最後同步時間: " + data.last_update;
 
-            // 命中走勢圖表
-            new Chart(document.getElementById('hitChart'), {
-                type: 'bar',
-                data: {
-                    labels: Array.from({length: 28}, (_, i) => i + 1),
-                    datasets: [{
-                        label: '命中數',
-                        data: data.hit_trend,
-                        backgroundColor: (c) => c.raw >= 3 ? '#4ee44e' : '#555'
-                    }]
-                }
-            });
+                // 渲染圖表 (Drift)
+                new Chart(document.getElementById('driftChart'), {
+                    type: 'line',
+                    data: {
+                        labels: ['-4h', '-3h', '-2h', '-1h', 'Now'],
+                        datasets: [{ label: '信心值', data: data.drift, borderColor: '#f0b90b', tension: 0.4 }]
+                    }
+                });
+
+                // 渲染圖表 (Hits)
+                new Chart(document.getElementById('hitChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: Array.from({length: 28}, (_, i) => i + 1),
+                        datasets: [{ label: '命中數', data: data.hit_trend, backgroundColor: '#4ee44e' }]
+                    }
+                });
+
+            } catch (e) {
+                document.getElementById('balls').innerHTML = "⚠️ 數據尚未就緒。請到 GitHub Actions 點擊 Run workflow！";
+            }
         }
-        initSystem();
+        loadData();
     </script>
 </body>
 </html>
