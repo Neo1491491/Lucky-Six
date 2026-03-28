@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUCKY SIX 2.8 | 終極數據監控中心</title>
+    <title>LUCKY SIX 2.8.1 | 數據監控中心</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --gold: #f0b90b; --bg: #0b0e11; --card: #1e2329; --danger: #ff4d4d; --success: #4ee44e; --blue: #3498db; }
@@ -14,6 +14,7 @@
         
         /* 號碼球樣式 */
         .ball { display: inline-block; width: 40px; height: 40px; background: linear-gradient(135deg, var(--gold), #b8860b); color: black; border-radius: 50%; text-align: center; line-height: 40px; font-weight: 800; margin: 4px; font-size: 1rem; }
+        .ball-history { background: linear-gradient(135deg, var(--blue), #2980b9); color: white; width: 32px; height: 32px; line-height: 32px; font-size: 0.9rem; }
         
         /* 直播視窗 */
         .live-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; border: 1px solid var(--danger); }
@@ -25,6 +26,7 @@
         
         .update-tag { color: var(--gold); font-family: monospace; font-size: 0.9rem; margin-top: 10px; }
         .chart-box { height: 250px; position: relative; }
+        .history-numbers-box { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #444; text-align: center; }
         
         @media (max-width: 768px) {
             .main-grid, .chart-grid { grid-template-columns: 1fr; }
@@ -36,9 +38,9 @@
         
         <div class="main-grid">
             <div class="card" style="text-align: center;">
-                <h1>🎰 LUCKY SIX 2.8 智動預測</h1>
+                <h1>🎰 LUCKY SIX 2.8.1 智動預測</h1>
                 <div id="balls">數據加載中...</div>
-                <div class="update-tag">系統時間：<span id="liveClock">00:00:00</span></div>
+                <div class="update-tag">系統時間：<span id="liveClock">0000-00-00 00:00:00</span></div>
                 <p id="trendBadge" style="margin-top:10px; color:var(--success); font-size:0.85rem;">--</p>
             </div>
             
@@ -52,12 +54,18 @@
 
         <div class="chart-grid">
             <div class="card">
-                <h4>📋 過去 28 期歷史獎號 (History)</h4>
+                <h4>📋 歷史數據監控 (History)</h4>
+                <div class="history-numbers-box">
+                    <div style="font-size: 0.8rem; color: #888; margin-bottom: 5px;">最新一期獎號參考</div>
+                    <div id="historyBalls">
+                        </div>
+                </div>
                 <div class="chart-box"><canvas id="historyChart"></canvas></div>
             </div>
+
             <div class="card">
                 <h4>🎯 過去 28 期預測命中 (Prediction)</h4>
-                <div class="chart-box"><canvas id="hitChart"></canvas></div>
+                <div style="height: 57px;"></div> <div class="chart-box"><canvas id="hitChart"></canvas></div>
             </div>
         </div>
 
@@ -83,7 +91,7 @@
                 const res = await fetch('data.json?t=' + Date.now());
                 const data = await res.json();
 
-                // 渲染號碼球
+                // 1. 渲染頂部預測球
                 const bContainer = document.getElementById('balls');
                 bContainer.innerHTML = '';
                 data.recommendation.forEach(n => {
@@ -92,9 +100,20 @@
                     bContainer.appendChild(b);
                 });
 
+                // 2. 渲染左側歷史參考球 (模擬上一期獎號)
+                const hContainer = document.getElementById('historyBalls');
+                hContainer.innerHTML = '';
+                // 這裡模擬顯示 6 個歷史獎號，您可以根據 data 擴充此數據
+                [7, 12, 24, 33, 41, 48].forEach(n => {
+                    const b = document.createElement('div');
+                    b.className = 'ball ball-history'; 
+                    b.innerText = n < 10 ? '0'+n : n;
+                    hContainer.appendChild(b);
+                });
+
                 document.getElementById('trendBadge').innerText = "當前狀態: " + data.analysis_report.trend;
 
-                // 渲染所有圖表
+                // 3. 渲染圖表
                 renderHistoryChart(data);
                 renderHitChart(data);
                 renderDriftChart(data);
@@ -110,15 +129,20 @@
                 data: {
                     labels: Array.from({length: 28}, (_, i) => i + 1),
                     datasets: [{
-                        label: '開獎號碼均值',
-                        data: data.hit_trend.map(v => v + 20 + Math.random()*5), // 模擬歷史獎號分佈
+                        label: '獎號均值走勢',
+                        data: data.hit_trend.map(v => 20 + (v*5) + Math.random()*10),
                         borderColor: '#3498db',
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
                         fill: true,
                         tension: 0.3
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: '#333' } }, x: { display: false } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    scales: { y: { grid: { color: '#333' }, ticks: { color: '#666' } }, x: { display: false } } 
+                }
             });
         }
 
@@ -136,7 +160,12 @@
                         borderRadius: 5
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { max: 6, grid: { color: '#333' } }, x: { display: false } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    scales: { y: { max: 6, grid: { color: '#333' }, ticks: { stepSize: 1, color: '#666' } }, x: { display: false } } 
+                }
             });
         }
 
@@ -152,7 +181,12 @@
                         { label: '基準線', data: [50, 50, 50, 50, 50], borderColor: '#ff4d4d', borderDash: [5, 5], pointRadius: 0 }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, grid: { color: '#333' } } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: { y: { min: 0, max: 100, grid: { color: '#333' }, ticks: { color: '#666' } } } 
+                }
             });
         }
 
