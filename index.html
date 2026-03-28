@@ -3,95 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUCKY SIX 2.4 | 專業能量監控站</title>
+    <title>LUCKY SIX 2.6 | 實時能量監測中心</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --gold: #f0b90b; --bg: #0b0e11; --card: #1e2329; --danger: #ff4d4d; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+        :root { --gold: #f0b90b; --bg: #0b0e11; --card: #1e2329; --danger: #ff4d4d; --success: #4ee44e; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; margin: 0; padding: 20px; }
         .container { max-width: 1100px; margin: auto; }
-        .card { background: var(--card); border-radius: 15px; padding: 25px; border: 1px solid #333; margin-bottom: 20px; position: relative; }
+        .card { background: var(--card); border-radius: 15px; padding: 25px; border: 1px solid #333; margin-bottom: 20px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .ball { display: inline-block; width: 45px; height: 45px; background: linear-gradient(135deg, var(--gold), #b8860b); color: black; border-radius: 50%; text-align: center; line-height: 45px; font-weight: 800; margin: 5px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(240, 185, 11, 0.3); }
-        .status-badge { position: absolute; top: 20px; right: 20px; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; background: rgba(78, 228, 78, 0.2); color: #4ee44e; border: 1px solid #4ee44e; }
+        .status-badge { position: absolute; top: 20px; right: 20px; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; background: rgba(78, 228, 78, 0.1); color: var(--success); border: 1px solid var(--success); }
         h1, h4 { color: var(--gold); margin-top: 0; }
         .info-text { font-size: 0.9rem; color: #aaa; margin-bottom: 15px; line-height: 1.6; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; }
+        .update-tag { color: #f0b90b; font-size: 0.9rem; margin-top: 15px; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card" style="text-align: center;">
-            <div class="status-badge" id="trendBadge">偵測中...</div>
-            <h1>🎰 LUCKY SIX 2.4 智動預測</h1>
+            <div class="status-badge" id="trendBadge">系統連線中...</div>
+            <h1>🎰 LUCKY SIX 2.6 智動預測</h1>
             <div id="balls">數據加載中...</div>
-            <p class="update-tag" id="lastUpdate" style="color:#888; font-size:0.8rem; margin-top:15px;"></p>
+            <div class="update-tag">系統時間：<span id="liveClock">0000-00-00 00:00:00</span></div>
         </div>
 
         <div class="card">
-            <h4>📊 系統分析標準</h4>
+            <h4>📊 能量漂移分析標準</h4>
             <p class="info-text">
-                能量漂移曲線以 <b>50分</b> 為基礎基準線。高於 50分 代表號碼進入「活躍區」，低於則處於「休眠期」。
-                本期系統偵測到 <b>核心信心值為 <span id="confVal" style="color:var(--gold)">--</span>%</b>，
-                主要權重分配：頻率 (40%) + 遺漏補償 (30%) + 尾數聯動 (30%)。
+                當前基準線：<b>50分 (Redline)</b>。系統每秒進行動態偵測，
+                核心信心值：<span id="confVal" style="color:var(--gold); font-weight:bold;">--</span>%。
+                推薦號碼基於 268 期歷史頻率與 28 期能量位移之共振交叉點。
             </p>
         </div>
 
         <div class="grid">
             <div class="card">
                 <h4>📈 能量漂移監控 (Confidence Drift)</h4>
-                <canvas id="driftChart"></canvas>
+                <div class="chart-container"><canvas id="driftChart"></canvas></div>
             </div>
             <div class="card">
                 <h4>💰 近 28 期命中趨勢 (Hit Ratio)</h4>
-                <canvas id="hitChart"></canvas>
+                <div class="chart-container"><canvas id="hitChart"></canvas></div>
             </div>
         </div>
     </div>
 
     <script>
-        async function updateDashboard() {
+        // 全域圖表變數，防止重複渲染
+        let driftChartInstance = null;
+        let hitChartInstance = null;
+
+        // 1. 動態時鐘邏輯
+        function startClock() {
+            const clockEl = document.getElementById('liveClock');
+            setInterval(() => {
+                const now = new Date();
+                const pad = (n) => n.toString().padStart(2, '0');
+                clockEl.innerText = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            }, 1000);
+        }
+
+        // 2. 數據初始化與偵錯邏輯
+        async function initDashboard() {
             try {
-                const res = await fetch('data.json?t=' + Date.now());
-                const data = await res.json();
-                
-                // 渲染號碼
+                const response = await fetch('data.json?t=' + Date.now());
+                if (!response.ok) throw new Error('Data Source Missing');
+                const data = await response.json();
+
+                // 更新文字資訊
+                document.getElementById('confVal').innerText = data.analysis_report ? data.analysis_report.confidence : "--";
+                document.getElementById('trendBadge').innerText = "趨勢: " + (data.analysis_report ? data.analysis_report.trend : "分析中");
+
+                // 更新號碼球
                 const bContainer = document.getElementById('balls');
                 bContainer.innerHTML = '';
                 data.recommendation.forEach(n => {
                     const b = document.createElement('div');
-                    b.className = 'ball'; b.innerText = n < 10 ? '0'+n : n;
+                    b.className = 'ball';
+                    b.innerText = n < 10 ? '0' + n : n;
                     bContainer.appendChild(b);
                 });
 
-                document.getElementById('lastUpdate').innerText = "最後同步: " + data.last_update;
-                document.getElementById('confVal').innerText = data.analysis_report.confidence;
-                document.getElementById('trendBadge').innerText = "趨勢: " + data.analysis_report.trend;
+                // 執行圖表繪製
+                renderDriftChart(data);
+                renderHitChart(data);
 
-                // 漂移圖表 (加入基準線)
-                new Chart(document.getElementById('driftChart'), {
-                    type: 'line',
-                    data: {
-                        labels: ['T-4', 'T-3', 'T-2', 'T-1', 'Now'],
-                        datasets: [
-                            { label: '推薦組能量', data: data.drift, borderColor: '#f0b90b', tension: 0.3, fill: false, borderWidth: 3 },
-                            { label: '基準線(50)', data: [50, 50, 50, 50, 50], borderColor: '#ff4d4d', borderDash: [5, 5], pointRadius: 0, fill: false }
-                        ]
-                    },
-                    options: { scales: { y: { min: 0, max: 100, ticks: { color: '#aaa' } }, x: { ticks: { color: '#aaa' } } } }
-                });
-
-                // 命中趨勢
-                new Chart(document.getElementById('hitChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: Array.from({length: 28}, (_, i) => i + 1),
-                        datasets: [{ label: '命中數', data: data.hit_trend, backgroundColor: '#4ee44e' }]
-                    },
-                    options: { scales: { y: { max: 6, ticks: { stepSize: 1, color: '#aaa' } } } }
-                });
-
-            } catch (e) { console.error("Data error", e); }
+            } catch (error) {
+                console.error("Dashboard Error:", error);
+                document.getElementById('balls').innerHTML = `<span style="color:var(--danger)">⚠️ 數據同步失敗，請確認 app.py 執行成功</span>`;
+            }
         }
-        updateDashboard();
+
+        // 3. 能量漂移圖表繪製 (偵錯後穩定版)
+        function renderDriftChart(data) {
+            const ctx = document.getElementById('driftChart').getContext('2d');
+            if (driftChartInstance) driftChartInstance.destroy(); // 銷毀舊實例
+
+            driftChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['T-4', 'T-3', 'T-2', 'T-1', '現在'],
+                    datasets: [
+                        {
+                            label: '推薦組能量',
+                            data: data.drift || [0,0,0,0,0],
+                            borderColor: '#f0b90b',
+                            backgroundColor: 'rgba(240, 185, 11, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '基準線(50)',
+                            data: [50, 50, 50, 50, 50],
+                            borderColor: '#ff4d4d',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { color: '#888' }, grid: { color: '#333' } },
+                        x: { ticks: { color: '#888' }, grid: { display: false } }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
+            });
+        }
+
+        // 4. 命中趨勢圖表繪製
+        function renderHitChart(data) {
+            const ctx = document.getElementById('hitChart').getContext('2d');
+            if (hitChartInstance) hitChartInstance.destroy();
+
+            hitChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 28}, (_, i) => i + 1),
+                    datasets: [{
+                        label: '命中數',
+                        data: data.hit_trend || [],
+                        backgroundColor: (c) => c.raw >= 3 ? '#4ee44e' : 'rgba(255, 255, 255, 0.2)',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { max: 6, ticks: { stepSize: 1, color: '#888' }, grid: { color: '#333' } },
+                        x: { display: false }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
+            });
+        }
+
+        // 啟動流程
+        window.onload = () => {
+            startClock();      // 啟動即時秒針
+            initDashboard();   // 讀取雲端數據
+        };
     </script>
 </body>
 </html>
